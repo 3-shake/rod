@@ -299,6 +299,21 @@ func (p *Page) getHelper(jsCtxID proto.RuntimeRemoteObjectID, name string) (prot
 	p.helpersLock.Lock()
 	defer p.helpersLock.Unlock()
 
+	id, ok := p.helpersOf(jsCtxID)[name]
+	return id, ok
+}
+
+func (p *Page) setHelper(jsCtxID proto.RuntimeRemoteObjectID, name string, fnID proto.RuntimeRemoteObjectID) {
+	p.helpersLock.Lock()
+	defer p.helpersLock.Unlock()
+
+	p.helpersOf(jsCtxID)[name] = fnID
+}
+
+// The lock is released while ensureJSHelper waits for the browser, during which getJSCtxID
+// on another goroutine can drop the cache. So every access must be able to recreate it.
+// The caller must hold helpersLock.
+func (p *Page) helpersOf(jsCtxID proto.RuntimeRemoteObjectID) map[string]proto.RuntimeRemoteObjectID {
 	if p.helpers == nil {
 		p.helpers = map[proto.RuntimeRemoteObjectID]map[string]proto.RuntimeRemoteObjectID{}
 	}
@@ -309,15 +324,7 @@ func (p *Page) getHelper(jsCtxID proto.RuntimeRemoteObjectID, name string) (prot
 		p.helpers[jsCtxID] = list
 	}
 
-	id, ok := list[name]
-	return id, ok
-}
-
-func (p *Page) setHelper(jsCtxID proto.RuntimeRemoteObjectID, name string, fnID proto.RuntimeRemoteObjectID) {
-	p.helpersLock.Lock()
-	defer p.helpersLock.Unlock()
-
-	p.helpers[jsCtxID][name] = fnID
+	return list
 }
 
 // Returns the page's window object, the page can be an iframe.
