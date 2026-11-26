@@ -302,3 +302,20 @@ func TestEvalObjectReferenceChainIsTooLong(t *testing.T) {
 	val := p.MustEval(`a => a.c.c.c.c.b`, obj)
 	g.Eq(val.Int(), 1)
 }
+
+func TestEvalHelperCacheDroppedWhileRegistering(t *testing.T) {
+	g := setup(t)
+
+	p := g.page.MustNavigate(g.blank())
+
+	// Simulate another goroutine that refreshes the js context
+	// while the helper registration is waiting for the browser.
+	g.mc.stub(1, proto.RuntimeCallFunctionOn{}, func(send StubSend) (gson.JSON, error) {
+		res, err := send()
+		p.MustNavigate(g.blank()).MustEval(`() => 1`)
+		return res, err
+	})
+
+	// Query on the page itself, because a clone such as the one made by HasX has its own cache field.
+	p.MustElementX("//body")
+}
